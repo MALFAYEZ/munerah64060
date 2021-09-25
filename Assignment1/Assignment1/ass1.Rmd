@@ -1,0 +1,71 @@
+---
+title: "ASSIGNMENT1.."
+author: "MUNERAH"
+date: "9/24/2021"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+### import the dataset into R 
+dataset <-read.csv("C:/Users/mnooo/Desktop/Datasets/Student.csv")
+## summary 
+summary(dataset)
+```
+
+
+
+```{r}
+### Descriptive Statistics for quantitave data
+hist(dataset$math.percentage,col = 'light blue')
+mean(dataset$math.percentage)
+median(dataset$math.percentage)
+
+```
+
+```{r}
+boxplot(dataset$writing.score.percentage,col = 'dark green')
+
+
+```
+
+```{r}
+###Categorical Variables
+class(dataset$sex)
+table(dataset$sex)
+mypct=round((table(dataset$sex))/(sum(table(dataset$sex)))*100)
+lbls=paste(names(table(dataset$sex)),mypct,"%")
+pie(table(dataset$sex),lbls,main = "Gender Percentage")
+
+```
+
+```{r}
+###variable transformation
+
+## adding new colmn for the GPA 
+library(tidyverse)
+
+dataset_mutate <- dataset %>% mutate(GPA = (dataset$math.percentage + dataset$reading.score.percentage + dataset$writing.score.percentage)/3)
+View(dataset_mutate)
+
+
+```
+
+```{r}
+### Plot 
+plot(dataset$writing.score.percentage,dataset$reading.score.percentage,col='black')
+
+```
+
+```{r}
+
+plot(dataset$math.percentage,dataset$GPA,col='black')
+
+```
+
+
+
+
+### SOURCE OF THE DATA SET https://www.kaggle.com/spscientist/students-performance-in-exams
