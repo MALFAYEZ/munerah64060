@@ -1,0 +1,226 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+dir.create("images")
+```
+
+
+
+```{r}
+#install.packages
+library(caret)
+library(ISLR)
+library(gmodels)
+library(ggplot2)
+library(FNN)
+library(dummies)
+library(fastDummies)
+library(e1071)
+library(dplyr)
+
+#install.packages("caret")
+library(caret)
+# install.packages("ISLR") # only install if needed
+library(ISLR)
+```
+
+
+```{r}
+library(readxl)
+uk <- read.csv("C:/Users/mnooo/Desktop/Datasets/UniversalBank.csv")
+#View(uk)
+
+```
+
+
+
+```{r}
+
+# Clean up data and get it ready for KNN
+library(dplyr)
+
+
+uk$Education_1 = ifelse(uk$Education ==1, 1, 0)
+uk$Education_2 = ifelse(uk$Education ==2, 1, 0)
+uk$Education_3 = ifelse(uk$Education ==3, 1, 0)
+uk$Personal_Loan = as.factor(uk$Personal.Loan)
+
+View(uk)
+
+uk1 <- uk[, c(2:4, 6:7, 9, 11:18)]   # Select a subset of variables, without ID and zipcode, original variable Personal.Loan
+head(uk1)
+str(uk1)
+```
+
+
+```{r}
+set.seed(15)
+Test_Index = createDataPartition(uk1$Age,p=0.2, list=FALSE) # 20% reserved for Test
+Test_Data = uk1[Test_Index,]
+TraVal_Data = uk1[-Test_Index,] # Validation and Training data is rest
+Train_Index = createDataPartition(TraVal_Data$Age,p=0.75, list=FALSE) # 75% of remaining data as training
+
+# 75% of the 80% is 60% which is training
+
+Train_Data = TraVal_Data[Train_Index,]
+Validation_Data = TraVal_Data[-Train_Index,] # rest as validation
+View(Train_Data)
+summary(Train_Data)
+summary(Validation_Data)
+summary(Test_Data)
+str(Train_Data)
+str(Validation_Data)
+str(Test_Data)
+
+```
+```{r}
+#Normalization
+
+# Copy the original data
+train.norm.df <- Train_Data
+valid.norm.df <- Validation_Data
+traval.norm.df <- TraVal_Data
+# use preProcess() from the caret package
+norm.values <- preProcess(Train_Data[, 1:13], method=c("center", "scale"))
+train.norm.df[, 1:13] <- predict(norm.values, Train_Data[, 1:13]) # Replace first two columns with normalized values
+valid.norm.df[, 1:13] <- predict(norm.values, Validation_Data[, 1:13])
+traval.norm.df[, 1:13] <- predict(norm.values, traval.norm.df[, 1:13])
+test.norm.df <- predict(norm.values, Test_Data[, 1:13])
+summary(train.norm.df)
+var(train.norm.df[, 1:13])
+summary(valid.norm.df)
+var(valid.norm.df[, 1:13])
+
+```
+
+
+```{r}
+
+dim(train.norm.df[, 1:13]) # Train is 13 numeric variable 
+dim(test.norm.df)         # Test is 13 numeric variable 
+table(train.norm.df[, 14])  # DV is logic (Y/N) variable
+library(FNN)
+nn <- knn(train = train.norm.df[, 1:13], test = test.norm.df, 
+          cl = train.norm.df[, 14], k = 1, prob=TRUE) # We use k = #Q1
+
+customer_df<- data.frame("Age" =40, "Experience"=10, "Income"=84, "Family"=2, "CCAvg"=2, "Mortgage"=0,  "Securities Account"=0, "CD Account"=0,  "Online" =1, "Credit Card"=1, "Education_1" = 0, "Education_2" = 1, "Education_3" = 0)
+
+customerClass <- knn(train.norm.df[, 1:13], customer_df,  cl = train.norm.df[, 14], k = 1, prob = 0.5)
+
+paste0("The customer is classified as: ", summary(customerClass))
+
+# print(nn) # uncomment for more output
+# row.names(Train_Data)[attr(nn, "nn.index")]
+
+#table(nn)
+#table(train.norm.df[, 14])
+#table(valid.norm.df[, 14])
+
+#nn <- knn(train.norm.df[, 1:13], valid.norm.df[, 1:13], cl = train.norm.df[, 14], k = 1)
+
+#confusionMatrix(nn, valid.norm.df[, 14])$overall[1] 
+
+```
+Q1 Answer: The customer is classified as: 1 (loan acceptance)
+```{r}
+#Q2
+# initialize a data frame with two columns: k, and accuracy.
+library(caret)
+accuracy.df <- data.frame(k = seq(1, 14, 1), accuracy = rep(0, 14))
+# compute knn for different k on validation.
+for(i in 1:14) {
+  knn.pred <- knn(train.norm.df[, 1:13], valid.norm.df[, 1:13], 
+                  cl = train.norm.df[, 14], k = i)
+  accuracy.df[i, 2] <- confusionMatrix(knn.pred, valid.norm.df[, 14])$overall[1] 
+}
+accuracy.df
+```
+The value of k that provides the best performance is k = 3. 
+k=3 gives the highest accuracy percentage of 95.5% however it should be noted that this classification model is built based on actual converted customers percentage of only 9.8% of the whole dataset which might be causing overfitting in the model
+
+```{r}
+#Q3 - Confusion Matrix 
+
+knn.pred <- knn(train.norm.df[, 1:13], valid.norm.df[, 1:13], 
+                  cl = train.norm.df[, 14], k = 3)
+confusionMatrix(knn.pred, valid.norm.df[, 14])$overall[1]
+confusionMatrix(knn.pred, valid.norm.df[, 14])
+
+```
+```{r}
+#Q4
+customerClass <- knn(train.norm.df[, 1:13], customer_df,  cl = train.norm.df[, 14], k = 3, prob = 0.5)
+
+paste0("The customer is classified as: ", summary(customerClass))
+
+```
+ The customer is classified as: 1 (loan acceptance)
+
+```{r}
+#Q5
+set.seed(15)
+Test_Index = createDataPartition(uk1$Age,p=0.2, list=FALSE) # 20% reserved for Test
+Test_Data = uk1[Test_Index,]
+TraVal_Data = uk1[-Test_Index,] # Validation and Training data is rest
+Train_Index = createDataPartition(TraVal_Data$Age, p=0.625, list=FALSE) # 62.5% of remaining data as training
+
+# 62.5% of the 80% is 50% which is training
+
+Train_Data = TraVal_Data[Train_Index,]
+Validation_Data = TraVal_Data[-Train_Index,] # rest as validation
+```
+
+ ## Normalization
+ 
+```{r}
+
+
+# Copy the original data
+train.norm.df <- Train_Data
+valid.norm.df <- Validation_Data
+traval.norm.df <- TraVal_Data
+# use preProcess() from the caret package to normalize Sales and Age.
+norm.values <- preProcess(Train_Data[, 1:13], method=c("center", "scale"))
+train.norm.df[, 1:13] <- predict(norm.values, Train_Data[, 1:13]) # Replace first two columns with normalized values
+valid.norm.df[, 1:13] <- predict(norm.values, Validation_Data[, 1:13])
+traval.norm.df[, 1:13] <- predict(norm.values, traval.norm.df[, 1:13])
+test.norm.df <- predict(norm.values, Test_Data[, 1:13])
+summary(train.norm.df)
+var(train.norm.df[, 1:13])
+summary(valid.norm.df)
+var(valid.norm.df[, 1:13])
+
+```
+
+  ## KNN
+```{r}
+
+library(FNN)
+nn <- knn(train = train.norm.df[, 1:13], test = test.norm.df, 
+          cl = train.norm.df[, 14], k = 3, prob=TRUE) 
+```
+
+  ## Confusion matrix
+
+```{r}
+
+knn.pred.valid <- knn(train.norm.df[, 1:13], valid.norm.df[, 1:13], 
+                  cl = train.norm.df[, 14], k = 3)
+confusionMatrix(knn.pred.valid, valid.norm.df[, 14])
+```
+
+```{r}
+
+knn.pred.train <- knn(train.norm.df[, 1:13], train.norm.df[, 1:13], 
+                  cl = train.norm.df[, 14], k = 3)
+confusionMatrix(knn.pred.train, train.norm.df[, 14])
+```
+
+
+
