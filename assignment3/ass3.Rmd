@@ -1,0 +1,191 @@
+---
+title: "Assignment 3"
+author: "MUNERAH"
+date: "10/11/2021"
+output: html_document
+---
+
+```{r}
+library(readxl)
+df<- read.csv("C:/Users/mnooo/Desktop/Datasets/UniversalBank.csv")
+str(df)
+```
+
+
+```{r }
+#install.packages
+library(dplyr)
+library(class)
+library(caret)
+library(FNN)
+library(e1071)
+library(reshape2)
+```
+
+
+
+```{r}
+### Change Numerical data to Catogerical 
+df$Personal.Loan<-factor(df$Personal.Loan)
+df$Online<-factor(df$Online)
+df$CreditCard <-factor(df$CreditCard)
+str(df)
+
+```
+
+```{r}
+### Divide the data into 60% training and 40% validation
+# First select the required variables
+selected.var <- c(10,13,14)
+set.seed(15)
+bank.tr.in = createDataPartition(df$Personal.Loan,p=0.6, list=FALSE) # 60% reserved for Training
+bank.tr = df[bank.tr.in,selected.var]
+bank.va <- df[-bank.tr.in,selected.var] # Validation  data is rest
+summary(bank.tr)
+summary (bank.va)
+
+```
+
+```{r}
+###Create a pivot table for the training data with Online as a column variable, CC as a row variable, and Loan as a secondary row variable.
+
+### using table function
+table(bank.tr)
+```
+
+
+
+```{r}
+##B. Consider the task of classifying a customer who owns a bank credit card and is actively using online banking services. Looking at the pivot table, what is the probability that this customer will accept the loan offer? [This is the probability of loan acceptance (Loan = 1) conditional on having a bank credit card (CC = 1) and being an active user of online banking services (Online = 1)].
+
+
+P1<-prop.table(table(bank.tr),margin = 2)
+P1
+```
+Looking to the pivot table , There are 507 customers who owns a bank credit card and actively using online service , 46 of them will accept the loan 
+The probability of a customer to accept the loan conditional on having a credit card and being an active of online services  is (46/507)*100 = 9.07%
+In another way : 0.0261/(0.0261+0.261) = 0.09
+
+
+```{r}
+##C. Create two separate pivot tables for the training data. One will have Loan (rows) as a function of Online (columns) and the other will have Loan (rows) as a function of CC.
+
+Pivot1 <- table(bank.tr$Personal.Loan,bank.tr$Online)
+pivot_df1 <- as.data.frame(Pivot1)
+colnames(pivot_df1) <- c("PersonalLoan", "Online")
+pivot_df1
+
+Pivot2 <- table(bank.tr$Personal.Loan,bank.tr$CreditCard)
+pivot_df2 <- as.data.frame(Pivot2)
+colnames(pivot_df2) <- c("PersonalLoan", "CreditCard")
+pivot_df2
+
+
+
+
+
+
+```
+```{r}
+##D. Compute the following quantities [P(A | B) means “the probability of A given B
+
+##i. P(CC = 1 | Loan = 1) 
+
+Pr1<- (table(bank.tr$CreditCard,bank.tr$Personal.Loan))
+Pr1[2,2]/(Pr1[2,2]+Pr1[1,2])
+Pr1
+
+
+
+```
+
+The result as shown is 28%
+
+```{r}
+
+##ii. P(Online = 1 | Loan = 1)
+
+Pr2<-table(bank.tr$Online , bank.tr$Personal.Loan)
+Pr2[2,2]/(Pr2[2,2]+Pr2[1,2])
+Pr2
+
+```
+
+The result as shown 59%
+```{r}
+##iii.P(Loan = 1) (the proportion of loan acceptors)
+Pr3<-table(bank.tr$Personal.Loan)
+Pr3[2]/(Pr3[2]+Pr3[1])
+Pr3
+
+
+
+```
+The result as shown approx 10%
+```{r}
+##iv. P(CC = 1 | Loan = 0)
+Pr4<-table(bank.tr$CreditCard,bank.tr$Personal.Loan)
+Pr4[2,1]/(Pr4[2,1]+Pr4[1,1])
+Pr4
+
+
+
+```
+The result as shown is 29%
+
+
+```{r}
+
+##v.P(Online = 1 | Loan = 0)
+Pr5<-table(bank.tr$Online , bank.tr$Personal.Loan)
+Pr5[2,1]/(Pr4[2,1]+Pr4[1,1])
+Pr5
+
+
+```
+The result as shown is 59%
+```{r}
+## vi. P(Loan = 0)
+Pr6<-table(bank.tr$Personal.Loan)
+Pr6[1]/(Pr5[1]+Pr5[2])
+Pr6
+
+
+
+```
+The result as shown approx 90%
+```{r}
+##E. Use the quantities computed above to compute the naive Bayes probability P(Loan = 1 | CC = 1, Online = 1)
+### C1 loan , X1 CC ,X2 Online 
+###P(C1|X1,X2) = 
+##(P(X1|C1)P(X2|C1)P(C1) ) / P(X1|C1)P(X2|C1)P(C1)+P(X1|C2)*P(X2|C2)*P(C2)
+x1<-((0.28125)*(0.593)*(0.096)) 
+x2<-((0.28125)*(0.593)*(0.096))+((0.2916)*(0.5866)*(0.904))
+nbresult<- (x1/x2)
+nbresult
+
+```
+```{r}
+##F. Compare this value with the one obtained from the pivot table in (B). Which is a more accurate estimate?
+
+# The result in B = 0.0907 ,in E =0.938,, there is no big different between them , and the value which is calculated by pivot table is more accurate because the Naive Base assume the probabilities being independent 
+
+
+
+```
+```{r}
+##G. Which of the entries in this table are needed for computing P(Loan = 1 | CC = 1, Online = 1)? Run
+##naive Bayes on the data. Examine the model output on training data, and find the entry that
+##corresponds to P(Loan = 1 | CC = 1, Online = 1). Compare this to the number you obtained in (E).
+
+bank.nb <- naiveBayes(Personal.Loan ~ ., data = bank.tr)
+bank.nb
+
+
+```
+```{r}((0.28125)*(0.593)*(0.096)) /
+((0.28125)*(0.593)*(0.096))+((0.2916)*(0.5866)*(0.904))
+= 0.0938
+##it gives identical result as it is in the question E . 
+
+```
