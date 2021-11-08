@@ -1,0 +1,203 @@
+---
+title: "Assignment 4"
+author: "MUNERAH"
+date: "11/1/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r }
+## Load the file
+
+library(readxl)
+df <- read.csv("C:/Users/mnooo/Desktop/Datasets/Pharmaceuticals.csv")
+
+```
+
+
+```{r }
+#install.packages
+
+library(dplyr)
+library(ISLR)
+library(utils)
+library(caret)
+library(factoextra)
+library(ggplot2)
+library(tidyverse)
+library(cowplot)
+library (psych)
+
+```
+
+```{r }
+##Explore the DataSet 
+
+str(df)
+##Show first 6 rows
+head(df)
+##Descriptive Statistics
+summary(df)
+## number of rows and colmns 
+dim(df)
+###21 row and 14 colmns 
+
+```
+
+```{r }
+##Running K-means Model 
+set.seed(123)
+df1<-df[,3:11] ### Select only numerical variabls
+dfnorm<-scale(df1)#Normalizing
+k4<-kmeans(dfnorm, centers = 4, nstart = 25)# Running with clusters K=4
+df1$Cluster <-k4$cluster  ### adding cluster to the data set
+df1$MedianRec <-df[,c(12)] ### adding varials back to the dataset 
+df1$Location <-df[, c(13)]
+df1$Exchange <-df[, c(14)]
+Clus1<-df1[order(df1$Cluster),]
+Clus1
+k4$centers ### centroid values
+k4$size 
+table(k4$cluster) ## show the size for each cluster
+
+
+
+```
+
+```{r }
+### Choosing the best K using elbow chart
+
+set.seed(123)
+df1<-df[,3:11]
+dfnorm<-scale(df1)
+fviz_nbclust(dfnorm, kmeans, method = "wss")
+
+
+```
+
+```{r }
+### Choosing the best K using Silhouette Method
+set.seed(123)
+df1<-df[,3:11]
+dfnorm<-scale(df1)
+fviz_nbclust(dfnorm, kmeans, method = "silhouette")
+```
+Both Graphs shows the optimal K value is equal 5 
+```{r }
+##Running K-means Model using the optimal k value k=5
+set.seed(123)
+df1<-df[,3:11] ### Select only numerical variabls
+dfnorm<-scale(df1)#Normalizing
+k5<-kmeans(dfnorm, centers = 5, nstart = 25)# Running with clusters K=5
+df1$Cluster <-k5$cluster
+df1$MedianRec <-df[,c(12)] 
+df1$Location <-df[, c(13)]
+df1$Exchange <-df[, c(14)]
+Clus2<-df1[order(df1$Cluster),]
+Clus2
+k5$centers ## show cenroid valus 
+k5$size
+table(k5$cluster)
+```
+
+```{r }
+
+fviz_cluster(k5, data = dfnorm) # Visualize the output
+
+```
+The points in the center of the shapes shows centroid points .
+I have tried Restart points grater than 25 , and the centroid values remains the same which means 25 restart points is goo enough .
+
+```{r }
+### #kmeans clustering, using euclidean distance
+distance<- dist(dfnorm, method = "euclidean") 
+fviz_dist(distance)
+
+```
+
+
+
+```{r }
+## For easier handling , will apply k=3 
+set.seed(123)
+df1<-df[,3:11] ### Select only numerical variabls
+dfnorm<-scale(df1)#Normalizing
+k3<-kmeans(dfnorm, centers =3, nstart = 25)# Running with clusters K=3
+df1$Cluster <-k3$cluster 
+df1$MedianRec <-df[,c(12)] 
+df1$Location <-df[, c(13)]
+df1$Exchange <-df[, c(14)]
+Clus3<-df1[order(df1$Cluster),]
+Clus3
+k3$centers ## show cenroid values 
+k3$size
+table(k3$cluster)
+
+```
+
+
+
+
+```{r }
+##Statistics Summary By each Cluster
+
+describeBy(x=Clus3,group="Cluster",skew = FALSE)
+
+```
+
+
+
+
+```{r }
+###link clusters with non-numerical variabls 
+
+df3<-  df %>% select(c(12,13,14)) %>%
+    mutate(Cluster =k3$cluster)
+df3
+
+
+```
+
+```{r }
+#plotting clusters with non-numerical variabls 
+
+med_rec <- ggplot(df3, mapping = aes(factor(Cluster), fill=Median_Recommendation)) +
+  geom_bar(position = 'dodge') +
+  labs(x='Clusters', y='Frequence')
+
+location<-ggplot(df3, mapping = aes(factor(Cluster), fill=Location)) +
+  geom_bar(position = 'dodge') + 
+  labs(x='Clusters', y='Frequence')
+
+exchange<- ggplot(df3, mapping = aes(factor(Cluster), fill=Exchange)) +
+ geom_bar(position = 'dodge') + 
+  labs(x='Clusters', y='Frequence')
+plot_grid(med_rec, location,exchange)
+
+
+```
+There is no clear trend for those categorical variables 
+```{r }
+###  Observations from the statistical summary 
+
+####Cluster 1 has low average of revenue growth and profit margin, with relatively high Beta , so it is not recommended
+
+####Cluster 2  has the highest mean for market capitalization = 97.11 , which looks interesting to invest at first look , but it has also high standard deviation which means some of the points has extreme values needed more investigation  . 
+
+####Cluster 3 has the highest average of revenue growth and profit margin with relatively few standard deviation, so it is recommended
+
+```
+
+```{r }
+### Rename cluster values  
+
+Clus3["Cluster"][Clus3["Cluster"] == "1"] <- "not recommended"
+Clus3["Cluster"][Clus3["Cluster"] == "2"] <- "needed more investigation"
+Clus3["Cluster"][Clus3["Cluster"] == "3"] <- "Recommended"
+Clus3
+
+
+
+```
+
