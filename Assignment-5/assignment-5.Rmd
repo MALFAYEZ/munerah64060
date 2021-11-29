@@ -1,0 +1,212 @@
+---
+title: "Assignment 5"
+author: "MUNERAH"
+date: "11/23/2021"
+output: html_document
+---
+
+
+
+```{r }
+## Load the file
+library(readxl)
+Cereals <- read.csv("C:/Users/mnooo/Desktop/Datasets/Cereals.csv")
+```
+
+```{r}
+# Loading the libraries
+library(tidyverse) 
+library(corrplot)
+library(tidymodels)
+library(cluster)
+library(factoextra)
+library(knitr)
+```
+
+
+```{r}
+## Data preprocessing
+# Transfer the cereal name into a row name
+Cereals <- data.frame(Cereals,row.names ='name')
+
+# Remove missing observations with unused features
+Cereals <- Cereals %>%
+        filter(complete.cases(.)) %>% 
+        select(-c(mfr,type,shelf))
+
+#Scale Numeric variables [Necessary for clustering]       
+scaled <-data.frame(scale(Cereals))
+
+```
+
+#### Apply hierarchical clustering to the data using Euclidean distance to the normalised mesurements.
+
+In this part, we shall be using AGNES to compare the clustering from single linkage, complete 
+linkage, average linkage, and Ward. We shall choose the best method.
+
+```{r}
+#Hierarchical Clustering
+metd<-c('single','complete','average','ward')
+names(metd)<- c('single','complete','average','ward')
+
+# we write a function which computes agglomerative clustering
+AGNES<- function(x){
+        agnes(scaled, method = x)$ac
+}
+
+```
+
+```{r}
+#calculate agglomerative coefficient for each clustering linkage method
+sapply(metd, AGNES)
+
+```
+
+We can see that Ward's minimum variance method provides the highest agglomerative coefficient. We will use it as our final model for hierarchical clustering.
+
+
+```{r}
+set.seed(100)
+#Compute th euclidean distance matrix
+dm<- dist(scaled, method = "euclidean")
+
+#We perform hierarchical clustering using ward's method
+wClust<- hclust(dm, method = "ward.D2")
+wClust
+
+```
+
+#### How many clusters will you choose?
+
+```{r}
+#Selecting  number of clusters K using gap-stat
+fviz_nbclust(scaled, hcut, method = "gap_stat") # K = 7
+```
+
+The gap-statistic does not suggest an ideal number of cluster as it indicates its optimal number to be 1. We will not use this but we will rather use 6 clusters.  
+
+
+```{r }
+# Plot Dendrogram of AGNES[Ward method]
+fviz_dend(wClust, k = 6,
+          main = "Dendogram for AGNES [ward method]",
+          cex = .6,
+          k_colors = c('#5BC0EB','#FDE74C','#9BC53D',
+                       '#B27092','#211A1E','#FF1B1C'),
+          color_labels_by_k = TRUE,
+          labels_track_height = 14,
+          ggtheme = theme_classic())
+
+```
+
+we can notice how these clusters are being partitioned with different colours from the dendrogram above.
+
+
+#### Comment on the structure of the clusters and their stability.
+
+In order to understand the structure of the cluster, we split the data into two. We perform Hierarchical Clustering on both partitions using AGNES `Ward method` and plotted the dendrograms.  
+
+```{r}
+
+#Partitioning the data randomly.
+index<-sample(1:nrow(scaled), 
+                             .5 * nrow(scaled))
+partA<- scaled[-index,]
+partB<-scaled[index,]
+
+```
+
+
+```{r}
+#For partA
+set.seed(100)
+dmA<- dist(partA, method = 'euclidean')
+aClust<- hclust(dmA, method = 'ward.D2')
+
+```
+
+
+We then plot a dendrogram for the first partition.  
+
+```{r }
+# Dendrogram for first partition
+fviz_dend(aClust, k = 6,
+          main = "Dendogram for partition A",
+          cex = .6,
+          k_colors = c('#5BC0EB','#FDE74C','#9BC53D',
+                       '#B27092','#211A1E','#FF1B1C'),
+          color_labels_by_k = TRUE,
+          labels_track_height = 14,
+          ggtheme = theme_classic())
+
+```
+
+
+We do a similar clustering on the second partition.
+
+```{r}
+#For partB
+set.seed(100)
+dmB<- dist(partB, method = 'euclidean')
+bClust<- hclust(dmB, method = 'ward.D2')
+```
+
+We then plot a dendrogram for the first partition.  
+
+```{r}
+# Dendrogram for second partition
+fviz_dend(bClust, k = 6,
+          main = "Dendogram for partition B",
+          cex = .6,
+          k_colors = c('#5BC0EB','#FDE74C','#9BC53D',
+                       '#B27092','#211A1E','#FF1B1C'),
+          color_labels_by_k = TRUE,
+          labels_track_height = 14,
+          ggtheme = theme_classic())
+
+```
+
+
+We discovered that the clusters maintain similar structure for more than 90% even when the data was randomly split. We may observe this by looking into the dendrogram for partition A and Partition B.
+
+#### Stability of the cluster
+A cluster is said to be stable if the partitioning remains similar when the dataset are randomised or the clustering process changes. 
+
+We use K means clustering to assess stability of the clusters.  
+```{r}
+set.seed(100)
+KM<-kmeans(scaled,6, nstart = 25)
+#Plot the clusters
+fviz_cluster(KM, data = scaled)
+```
+
+We may see an exact clustering pattern if we examine both the dendrogram and the cluster plot for the K means algorithm.
+
+#### Finding a cluster of “healthy cereals.”
+To identify the cluster with healthy cereals, we may be interested in using rating but we have to identify the features which influences rating through our correlation plot.
+
+From our correlation plot, sugar and calories are having significant negative effect on ratings and protein and fiber has positive effect on rating. We may use these variables or rating to select the cluster with the best nutritional content.  
+
+```{r warning=FALSE}
+# assign cluster to data
+cuts<-cutree(wClust, k = 6)
+clusterData<- cbind(Cereals, cluster = cuts)
+
+centroids<- clusterData %>%
+        group_by(cluster) %>%
+        summarise_all(funs(mean))
+
+kable(round(centroids,2))
+```
+
+
+Cluster 1 has the highest rating with an average of 73.8. This cluster has cereals with the highest 
+Protein and fibre but with the least calories. It has almost close to the least sugar on average too. 
+Cluster 1 has `100% Bran`, `All Bran` and `All Bran with extra fibre` as the cereals in it.
+
+
+#### Should the data be normalised
+For this goal, we use the main dataset which is not normalised so as to be able to properly interpret the result but we use normalised data to obtain clusters since each variable has different measurement scale.  
+
+#### How should they be used in the cluster analysis?
+In order to use this in the cluster analysis, we assigned the cluster values to each cereal in the original dataset and computed the mean for each features based on the clusters assigned. This makes it easy to analyse and advise on which cluster has the healthy cereals.
