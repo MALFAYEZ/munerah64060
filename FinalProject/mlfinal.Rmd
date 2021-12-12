@@ -1,0 +1,120 @@
+---
+title: "Final_Decisiontree"
+author: "MUNERAH"
+date: "12/3/2021"
+output: html_document
+---
+
+```{r}
+## Load the file
+
+
+library(readxl)
+df <- read.csv("C:/Users/mnooo/Desktop/MLdrafft/general_data__hr.csv")
+
+```
+
+
+```{r}
+
+# loading library
+library(dplyr)
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(ROSE)
+library(rattle)
+library(caret)
+
+```
+
+###Preprocessing the dataset
+
+```{r}
+
+#converting chr to factor
+df <- df %>% mutate_if(is.character, as.factor)
+#converting int to num
+df <- df %>% mutate_if(is.integer, as.numeric)
+
+# Treating NA values
+df<-na.omit(df)
+
+# dummy coding attrition 
+
+df$Attrition<- ifelse(df$Attrition=="Yes",1,0)
+
+```
+
+```{r}
+
+# training and testing split
+set.seed(100)
+Index <- sample(1:nrow(df),3300)
+training <- df[Index,] #75%
+testing <- df[-Index,] #25%
+
+```
+Building a decision tree model
+```{r}
+
+model_rpart <- rpart(Attrition~.,data = training)
+
+rpart.plot(model_rpart) ## plot the decision tree
+printcp(model_rpart) ## complexity values and other detaied result
+plotcp(model_rpart) ## plot the cp values VS relatively errors
+```
+
+Pruning the tree using the least error founds in cp values VS relatively errors plot 
+```{r}
+###Pruning the tree using cp = 0.012 which has less error 
+model_rpart_manual <- rpart(Attrition~., 
+                     data = training, 
+                     control =rpart.control(cp = 0.012)) 
+rpart.plot(model_rpart_manual)  ## plot the tree 
+
+
+
+```
+ The tree is not performing good. The model must have a minimum error factor with better cp as well 
+
+
+### purning the tree 
+```{r}
+ptree<- prune(model_rpart,
+              cp= model_rpart$cptable[which.min(model_rpart$cptable[,"rel error"]),"CP"])
+fancyRpartPlot(ptree,
+               uniform=TRUE,
+               main="Pruned Classification Tree")
+Control=trainControl(method= "repeatedcv",number=10,repeats=10,classProbs=TRUE,summaryFunction =multiClassSummary)
+
+
+```
+Using different parameters, this tree has balanced error and cp value as well . This tree has the optimal number of splits with seven nodes and eight terminals .
+
+###Variable Importance using randomForest
+```{r}
+model_rf <- randomForest(Attrition~.,data = training)
+varImpPlot(model_rf,main = "Variable Importance Plot")
+
+```
+This plot shows the variables importance that affect the dependent variable attrition.
+
+###Performance evaluation for the models
+```{r}
+
+# predict Rpart 
+pred_rpart <- predict(model_rpart,newdata = testing)
+pred_rpart<-floor(pred_rpart+0.5)
+roc.curve(as.factor(pred_rpart),testing$Attrition) # 76.9%
+
+# predict random forest
+pred_rf <- predict(model_rf,newdata = testing)
+pred_rf<-floor(pred_rf+0.5)
+roc.curve(as.factor(pred_rf),testing$Attrition) # 99%
+
+```
+
+
+
